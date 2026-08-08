@@ -1,109 +1,113 @@
+import os
+from functools import lru_cache
+
 import joblib
 import pandas as pd
 
 
 # ======================================
-# LOAD MODEL
+# BASE DIRECTORY
 # ======================================
 
-model = joblib.load(
-    "model/disease_model.pkl"
-)
-
-encoder = joblib.load(
-    "model/label_encoder.pkl"
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
 )
 
 
 # ======================================
-# LOAD SYMPTOM COLUMNS
+# FILE PATHS
 # ======================================
 
-symptom_columns = joblib.load(
-    "model/symptom_columns.pkl"
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "model",
+    "disease_model.pkl"
 )
 
-print(
-    "Total symptom columns:",
-    len(symptom_columns)
+ENCODER_PATH = os.path.join(
+    BASE_DIR,
+    "model",
+    "label_encoder.pkl"
 )
 
+SYMPTOM_COLUMNS_PATH = os.path.join(
+    BASE_DIR,
+    "model",
+    "symptom_columns.pkl"
+)
 
-# ======================================
-# LOAD RICH SYMPTOM DATASET
-# ======================================
-
-RICH_DATASET_PATH = (
-    "../backend/datasets/"
+RICH_DATASET_PATH = os.path.join(
+    BASE_DIR,
+    "..",
+    "backend",
+    "datasets",
     "Diseases_and_Symptoms_dataset.csv"
 )
 
-rich_df = pd.read_csv(
-    RICH_DATASET_PATH,
-    low_memory=False
+DESCRIPTION_PATH = os.path.join(
+    BASE_DIR,
+    "dataset",
+    "symptom_Description.csv"
 )
 
-rich_df.columns = (
-    rich_df.columns
-    .astype(str)
-    .str.strip()
-    .str.lower()
+PRECAUTION_PATH = os.path.join(
+    BASE_DIR,
+    "dataset",
+    "symptom_precaution.csv"
 )
 
 
 # ======================================
-# PREPARE RICH DATASET
+# LAZY LOAD ML MODEL
 # ======================================
 
-def convert_value(value):
+_model = None
+_encoder = None
+_symptom_columns = None
 
-    if pd.isna(value):
-        return 0
 
-    value = (
-        str(value)
-        .strip()
-        .lower()
+def load_ml_resources():
+
+    global _model
+    global _encoder
+    global _symptom_columns
+
+    if _model is None:
+
+        _model = joblib.load(
+            MODEL_PATH
+        )
+
+    if _encoder is None:
+
+        _encoder = joblib.load(
+            ENCODER_PATH
+        )
+
+    if _symptom_columns is None:
+
+        _symptom_columns = joblib.load(
+            SYMPTOM_COLUMNS_PATH
+        )
+
+        print(
+            "Total symptom columns:",
+            len(_symptom_columns)
+        )
+
+    return (
+        _model,
+        _encoder,
+        _symptom_columns
     )
 
-    if value in [
-        "yes",
-        "1",
-        "true",
-        "present"
-    ]:
-        return 1
-
-    return 0
-
-
-rich_symptom_columns = [
-    column
-    for column in rich_df.columns
-    if column != "diseases"
-]
-
-
-for column in rich_symptom_columns:
-
-    rich_df[column] = rich_df[column].map(
-        convert_value
-    )
-
-
-rich_df["diseases"] = (
-    rich_df["diseases"]
-    .astype(str)
-    .str.strip()
-)
-
 
 # ======================================
-# LOAD DESCRIPTION DATA
+# LOAD SMALL INFORMATION DATASETS
 # ======================================
 
 description_df = pd.read_csv(
-    "dataset/symptom_Description.csv"
+    DESCRIPTION_PATH
 )
 
 description_df["Disease"] = (
@@ -113,12 +117,8 @@ description_df["Disease"] = (
 )
 
 
-# ======================================
-# LOAD PRECAUTION DATA
-# ======================================
-
 precaution_df = pd.read_csv(
-    "dataset/symptom_precaution.csv"
+    PRECAUTION_PATH
 )
 
 precaution_df["Disease"] = (
@@ -126,6 +126,64 @@ precaution_df["Disease"] = (
     .astype(str)
     .str.strip()
 )
+
+
+# ======================================
+# NORMALIZE SYMPTOM
+# ======================================
+
+def normalize_symptom(symptom):
+
+    return (
+        str(symptom)
+        .strip()
+        .lower()
+        .replace("-", " ")
+        .replace("_", " ")
+    )
+
+
+# ======================================
+# RICH DATASET COLUMN CACHE
+# ======================================
+
+_rich_columns = None
+
+
+def get_rich_dataset_columns():
+
+    global _rich_columns
+
+    if _rich_columns is not None:
+        return _rich_columns
+
+    # Only read CSV header.
+    # This does NOT load the complete dataset into RAM.
+    header_df = pd.read_csv(
+        RICH_DATASET_PATH,
+        nrows=0
+    )
+
+    original_columns = (
+        header_df.columns
+        .astype(str)
+        .tolist()
+    )
+
+    normalized_map = {}
+
+    for column in original_columns:
+
+        normalized_map[
+            normalize_symptom(column)
+        ] = column
+
+    _rich_columns = {
+        "original": original_columns,
+        "normalized": normalized_map
+    }
+
+    return _rich_columns
 
 
 # ======================================
@@ -140,7 +198,10 @@ def get_description(disease):
     ]
 
     if row.empty:
-        return "Description not available."
+
+        return (
+            "Description not available."
+        )
 
     return str(
         row.iloc[0]["Description"]
@@ -172,13 +233,18 @@ def get_precautions(disease):
         if column_name not in row.columns:
             continue
 
-        value = row.iloc[0][column_name]
+        value = row.iloc[0][
+            column_name
+        ]
 
         if pd.notna(value):
 
-            value = str(value).strip()
+            value = str(
+                value
+            ).strip()
 
             if value:
+
                 precautions.append(
                     value
                 )
@@ -313,11 +379,14 @@ SPECIALIST_MAP = {
 
 def get_specialist(disease):
 
-    disease = str(disease).strip()
+    disease = str(
+        disease
+    ).strip()
 
     for key, value in SPECIALIST_MAP.items():
 
         if key.lower() == disease.lower():
+
             return value
 
     return "General Physician"
@@ -362,7 +431,9 @@ MEDIUM_SEVERITY = {
 
 def get_severity(disease):
 
-    disease = str(disease).strip()
+    disease = str(
+        disease
+    ).strip()
 
     if disease in HIGH_SEVERITY:
         return "High"
@@ -374,27 +445,18 @@ def get_severity(disease):
 
 
 # ======================================
-# NORMALIZE SYMPTOM
-# ======================================
-
-def normalize_symptom(symptom):
-
-    return (
-        str(symptom)
-        .strip()
-        .lower()
-        .replace("-", " ")
-        .replace("_", " ")
-    )
-
-
-# ======================================
 # CREATE ML INPUT
 # ======================================
 
 def create_input_dataframe(
     selected_symptoms
 ):
+
+    (
+        model,
+        encoder,
+        symptom_columns
+    ) = load_ml_resources()
 
     input_data = {
         column: 0
@@ -440,6 +502,7 @@ def create_input_dataframe(
 
 # ======================================
 # DATASET PATTERN MATCHING
+# MEMORY OPTIMIZED
 # ======================================
 
 def get_dataset_predictions(
@@ -453,141 +516,291 @@ def get_dataset_predictions(
         for symptom in selected_symptoms
     }
 
+    dataset_columns = (
+        get_rich_dataset_columns()
+    )
+
+    normalized_map = (
+        dataset_columns["normalized"]
+    )
+
+    # Find actual CSV column names
     matched_columns = []
 
-    for column in rich_symptom_columns:
+    for normalized_symptom in (
+        normalized_selected
+    ):
 
-        normalized_column = (
-            normalize_symptom(column)
-        )
-
-        if (
-            normalized_column
-            in normalized_selected
-        ):
+        if normalized_symptom in normalized_map:
 
             matched_columns.append(
-                column
+                normalized_map[
+                    normalized_symptom
+                ]
             )
 
     if not matched_columns:
         return []
 
 
-    # ----------------------------------
-    # Count how many selected symptoms
-    # each record contains
-    # ----------------------------------
+    # ==================================
+    # READ ONLY REQUIRED COLUMNS
+    # ==================================
 
-    symptom_score = (
-        rich_df[matched_columns]
-        .sum(axis=1)
-    )
+    use_columns = [
+        "diseases"
+    ]
+
+    for column in matched_columns:
+
+        if column not in use_columns:
+
+            use_columns.append(
+                column
+            )
 
 
-    # Keep records having at least
-    # one selected symptom
-    matching_df = rich_df[
-        symptom_score > 0
-    ].copy()
+    # ==================================
+    # AGGREGATE WITHOUT LOADING
+    # COMPLETE CSV INTO RAM
+    # ==================================
+
+    disease_sum = {}
+    disease_max = {}
+    disease_count = {}
+
+    total_matching_rows = 0
 
 
-    if matching_df.empty:
+    # Small chunks keep RAM usage low.
+    for chunk in pd.read_csv(
+        RICH_DATASET_PATH,
+        usecols=use_columns,
+        chunksize=1000,
+        low_memory=False
+    ):
+
+        # Convert symptom columns to 0/1
+        score_series = pd.Series(
+            0,
+            index=chunk.index,
+            dtype="int64"
+        )
+
+        for column in matched_columns:
+
+            values = (
+                chunk[column]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+
+            score_series = (
+                score_series
+                + values.isin(
+                    [
+                        "yes",
+                        "1",
+                        "true",
+                        "present"
+                    ]
+                ).astype("int64")
+            )
+
+
+        # Keep rows having at least
+        # one selected symptom.
+        matching_mask = (
+            score_series > 0
+        )
+
+        if not matching_mask.any():
+            continue
+
+
+        matching_chunk = (
+            chunk.loc[
+                matching_mask,
+                ["diseases"]
+            ].copy()
+        )
+
+        matching_scores = (
+            score_series[
+                matching_mask
+            ]
+        )
+
+
+        matching_chunk[
+            "_match_score"
+        ] = matching_scores.values
+
+
+        total_matching_rows += (
+            len(matching_chunk)
+        )
+
+
+        # ==================================
+        # AGGREGATE DISEASE SCORES
+        # ==================================
+
+        for disease, group in (
+            matching_chunk
+            .groupby("diseases")
+        ):
+
+            disease = str(
+                disease
+            ).strip()
+
+            scores = (
+                group["_match_score"]
+            )
+
+            current_sum = (
+                disease_sum.get(
+                    disease,
+                    0
+                )
+            )
+
+            current_max = (
+                disease_max.get(
+                    disease,
+                    0
+                )
+            )
+
+            current_count = (
+                disease_count.get(
+                    disease,
+                    0
+                )
+            )
+
+            disease_sum[disease] = (
+                current_sum
+                + float(scores.sum())
+            )
+
+            disease_max[disease] = max(
+                current_max,
+                float(scores.max())
+            )
+
+            disease_count[disease] = (
+                current_count
+                + int(scores.count())
+            )
+
+
+    if not disease_sum:
         return []
 
 
-    matching_df["_match_score"] = (
-        symptom_score[
-            matching_df.index
-        ]
-    )
-
-
-    # ----------------------------------
-    # Disease ranking
-    # ----------------------------------
-
-    disease_scores = (
-        matching_df
-        .groupby("diseases")[
-            "_match_score"
-        ]
-        .agg(
-            [
-                "mean",
-                "max",
-                "count"
-            ]
-        )
-    )
-
-
-    # ----------------------------------
-    # Weighted score
-    # ----------------------------------
+    # ==================================
+    # DISEASE RANKING
+    # ==================================
 
     total_selected = len(
         matched_columns
     )
 
-    disease_scores[
-        "score"
-    ] = (
+    disease_scores = []
 
-        (
-            disease_scores["mean"]
-            / total_selected
+
+    for disease in disease_sum:
+
+        total_sum = (
+            disease_sum[disease]
         )
-        * 0.60
 
-        +
-
-        (
-            disease_scores["max"]
-            / total_selected
+        count = (
+            disease_count[disease]
         )
-        * 0.25
 
-        +
-
-        (
-            disease_scores["count"]
-            / len(matching_df)
+        maximum = (
+            disease_max[disease]
         )
-        * 0.15
 
+        mean_value = (
+            total_sum / count
+        )
+
+
+        # Same weighting as old version
+        score = (
+
+            (
+                mean_value
+                / total_selected
+            )
+            * 0.60
+
+            +
+
+            (
+                maximum
+                / total_selected
+            )
+            * 0.25
+
+            +
+
+            (
+                count
+                / total_matching_rows
+            )
+            * 0.15
+
+        )
+
+
+        disease_scores.append({
+
+            "disease": disease,
+
+            "score": score
+
+        })
+
+
+    # Highest score first
+    disease_scores.sort(
+        key=lambda item:
+            item["score"],
+        reverse=True
     )
 
 
+    # Keep top 3
     disease_scores = (
-        disease_scores
-        .sort_values(
-            "score",
-            ascending=False
-        )
-        .head(3)
+        disease_scores[:3]
     )
 
 
-    # ----------------------------------
-    # Convert scores to percentages
-    # ----------------------------------
+    # ==================================
+    # CONVERT TO CONFIDENCE %
+    # ==================================
 
-    total_score = (
-        disease_scores["score"]
-        .sum()
+    total_score = sum(
+        item["score"]
+        for item in disease_scores
     )
+
 
     predictions = []
 
-    for disease, row in (
-        disease_scores.iterrows()
-    ):
+
+    for item in disease_scores:
 
         if total_score > 0:
 
             confidence = (
-                row["score"]
+                item["score"]
                 / total_score
             ) * 100
 
@@ -598,12 +811,14 @@ def get_dataset_predictions(
 
         predictions.append({
 
-            "disease": disease,
+            "disease":
+                item["disease"],
 
-            "confidence": round(
-                float(confidence),
-                2
-            )
+            "confidence":
+                round(
+                    float(confidence),
+                    2
+                )
 
         })
 
@@ -637,8 +852,11 @@ def predict_disease(
                 "Please select at least one symptom.",
 
             "precautions": [
+
                 "Select at least one symptom.",
+
                 "Consult a qualified doctor."
+
             ],
 
             "top_predictions": [],
@@ -648,6 +866,7 @@ def predict_disease(
             "diet": [],
 
             "exercises": []
+
         }
 
 
@@ -666,6 +885,13 @@ def predict_disease(
     # ML PREDICTION
     # ==================================
 
+    (
+        model,
+        encoder,
+        symptom_columns
+    ) = load_ml_resources()
+
+
     input_df, matched_symptoms = (
         create_input_dataframe(
             selected_symptoms
@@ -675,6 +901,7 @@ def predict_disease(
 
     ml_predictions = []
 
+
     if matched_symptoms:
 
         probabilities = (
@@ -683,10 +910,12 @@ def predict_disease(
             )[0]
         )
 
+
         indices = (
             probabilities
             .argsort()[-5:][::-1]
         )
+
 
         for index in indices:
 
@@ -727,6 +956,7 @@ def predict_disease(
             dataset_predictions
         )
 
+
     elif ml_predictions:
 
         top_prediction = (
@@ -745,6 +975,7 @@ def predict_disease(
         top_predictions = [
 
             {
+
                 "disease":
                     item["disease"],
 
@@ -753,10 +984,14 @@ def predict_disease(
                         item["confidence"],
                         2
                     )
+
             }
 
-            for item in ml_predictions[:3]
+            for item
+            in ml_predictions[:3]
+
         ]
+
 
     else:
 
@@ -776,8 +1011,11 @@ def predict_disease(
                 "The selected symptoms could not be matched with the available dataset.",
 
             "precautions": [
+
                 "Please select valid symptoms.",
+
                 "Consult a qualified doctor."
+
             ],
 
             "top_predictions": [],
@@ -787,6 +1025,7 @@ def predict_disease(
             "diet": [],
 
             "exercises": []
+
         }
 
 
@@ -834,6 +1073,7 @@ def predict_disease(
             "Stay hydrated.",
 
             "Take proper rest."
+
         ]
 
 
@@ -843,20 +1083,26 @@ def predict_disease(
 
     return {
 
-        "disease": disease,
+        "disease":
+            disease,
 
-        "confidence": round(
-            float(confidence),
-            2
-        ),
+        "confidence":
+            round(
+                float(confidence),
+                2
+            ),
 
-        "severity": severity,
+        "severity":
+            severity,
 
-        "specialist": specialist,
+        "specialist":
+            specialist,
 
-        "description": description,
+        "description":
+            description,
 
-        "precautions": precautions,
+        "precautions":
+            precautions,
 
         "top_predictions":
             top_predictions,
@@ -866,4 +1112,5 @@ def predict_disease(
         "diet": [],
 
         "exercises": []
+
     }
