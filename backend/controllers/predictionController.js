@@ -27,17 +27,16 @@ export const predictDisease = async (req, res) => {
 
     }
 
-    const mlResponse = await axios.post(
+    const ML_API_URL =
+  process.env.ML_API_URL ||
+  "https://medipredict-ai-2-hcbc.onrender.com";
 
-      process.env.ML_API_URL + "/predict",
-
-      {
-
-        symptoms
-
-      }
-
-    );
+const mlResponse = await axios.post(
+  `${ML_API_URL}/predict`,
+  {
+    symptoms,
+  }
+);
 
     if (!mlResponse.data.success) {
 
