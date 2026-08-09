@@ -28,16 +28,42 @@ connectDB();
 
 /*
 =====================================
-MIDDLEWARES
+CORS
 =====================================
 */
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://medi-predict-ai-ebon.vercel.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests with no origin
+      // Example: Postman, server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.log("❌ CORS blocked:", origin);
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
+
+/*
+=====================================
+MIDDLEWARES
+=====================================
+*/
 
 app.use(express.json());
 
