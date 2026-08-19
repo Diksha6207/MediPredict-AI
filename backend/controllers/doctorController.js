@@ -120,167 +120,99 @@ RECOMMEND DOCTORS
 =========================================
 */
 
-export const recommendDoctors = async (
-
-  req,
-
-  res
-
-) => {
-
+export const recommendDoctors = async (req, res) => {
   try {
-
-    const {
-
-      specialist,
-
-      city
-
-    } = req.query;
-
-    const hospitals = await Hospital.find({
-
-  $or: [
-
-    {
-
-      city: {
-
-        $regex: city,
-
-        $options: "i"
-
-      }
-
-    },
-
-    {
-
-      district: {
-
-        $regex: city,
-
-        $options: "i"
-
-      }
-
-    }
-
-  ]
-
-}).limit(20);
+    const { specialist, city } = req.query;
 
     if (!city || city.trim() === "") {
-
       return res.status(400).json({
-
         success: false,
-
         message: "City is required."
-
       });
-
     }
 
-    const {
+    const hospitals = await Hospital.find({
+      $or: [
+        {
+          city: {
+            $regex: city,
+            $options: "i"
+          }
+        },
+        {
+          district: {
+            $regex: city,
+            $options: "i"
+          }
+        }
+      ]
+    }).limit(20);
 
-      lat,
-
-      lon
-
-    } = await getCoordinates(city);
-
-    const overpassQuery = `
-[out:json][timeout:25];
-
-(
-node["amenity"="hospital"](around:15000,${lat},${lon});
-way["amenity"="hospital"](around:15000,${lat},${lon});
-relation["amenity"="hospital"](around:15000,${lat},${lon});
-
-node["healthcare"="doctor"](around:15000,${lat},${lon});
-way["healthcare"="doctor"](around:15000,${lat},${lon});
-relation["healthcare"="doctor"](around:15000,${lat},${lon});
-);
-
-out center tags;
-`;
+    if (hospitals.length === 0) {
+      return res.status(200).json({
+        success: true,
+        total: 0,
+        doctors: []
+      });
+    }
 
     const doctors = hospitals.map((hospital) => ({
+      id: hospital._id,
 
-  id: hospital._id,
+      name: hospital.hospitalName,
 
-  name: hospital.hospitalName,
+      specialization:
+        specialist || "General Physician",
 
-  specialization: specialist || "General Physician",
+      hospital: hospital.hospitalName,
 
-  hospital: hospital.hospitalName,
+      address: hospital.address,
 
-  address: hospital.address,
+      phone:
+        hospital.phone &&
+        hospital.phone !== "0"
+          ? hospital.phone
+          : hospital.mobile &&
+            hospital.mobile !== "0"
+          ? hospital.mobile
+          : "",
 
-  phone:
-  hospital.phone &&
-  hospital.phone !== "0"
-    ? hospital.phone
-    : hospital.mobile &&
-      hospital.mobile !== "0"
-    ? hospital.mobile
-    : "",
+      website:
+        hospital.website &&
+        hospital.website !== "0"
+          ? hospital.website
+          : "",
 
-website:
-  hospital.website &&
-  hospital.website !== "0"
-    ? hospital.website
-    : "",
+      rating: 4.5,
 
-  rating: 4.5,
+      status: "Open",
 
-  status: "Open",
+      map: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        hospital.hospitalName + " " + city
+      )}`
+    }));
 
-  map: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    hospital.hospitalName + " " + city
-  )}`
+    const uniqueDoctors =
+      removeDuplicates(doctors);
 
-}));
+    return res.status(200).json({
+      success: true,
+      total: uniqueDoctors.length,
+      doctors: uniqueDoctors
+    });
+  } catch (error) {
+    console.error(
+      "Doctor API Error:",
+      error.message
+    );
 
-const uniqueDoctors = removeDuplicates(doctors);
-
-return res.status(200).json({
-
-  success: true,
-
-  total: uniqueDoctors.length,
-
-  doctors: uniqueDoctors
-
-});
-
-}
-
-catch (error) {
-
-  console.error(
-
-    "Doctor API Error:",
-
-    error.response?.data ||
-
-    error.message
-
-  );
-
-  return res.status(500).json({
-
-    success: false,
-
-    doctors: [],
-
-    message: "Unable to fetch nearby doctors."
-
-  });
-
-}
-
+    return res.status(500).json({
+      success: false,
+      doctors: [],
+      message:
+        "Unable to fetch nearby doctors."
+    });
+  }
 };
 
 /*

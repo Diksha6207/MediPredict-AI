@@ -1,28 +1,26 @@
-# 🩺 MediPredict AI
+# MediPredict AI
 
-MediPredict AI is an AI-powered disease prediction and healthcare recommendation platform.
+## Overview
 
-## 🚀 Features
+MediPredict AI is an AI-powered disease prediction platform that predicts diseases based on user symptoms and recommends doctors and hospitals.
 
-- User Registration and Login (JWT Authentication)
-- AI-based Disease Prediction
-- Doctor Recommendations
-- Disease Information
-- Prediction History
-- Health Reports
-- Feedback System
-- Responsive User Interface
+## Features
 
----
+- User authentication
+- AI-based disease prediction
+- Medical history management
+- Report generation
+- Doctor recommendations
+- Hospital recommendations
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 
 - React.js
 - Axios
 - React Router
-- Vercel
+- CSS
 
 ### Backend
 
@@ -30,7 +28,6 @@ MediPredict AI is an AI-powered disease prediction and healthcare recommendation
 - Express.js
 - MongoDB
 - JWT Authentication
-- Render
 
 ### Machine Learning
 
@@ -39,61 +36,37 @@ MediPredict AI is an AI-powered disease prediction and healthcare recommendation
 - Scikit-learn
 - Pandas
 - NumPy
-- Joblib
-- Render
 
----
+## Deployment
 
-## 📂 Project Structure
-MediPredict-AI/
-├── frontend/
-├── backend/
-├── ml/
-└── README.md
+### Frontend
 
+Vercel
 
----
+### Backend
 
-## 🔐 Authentication
+Render
 
-- User Registration
-- User Login
-- JWT Token-based Authentication
-- Protected Routes
+### ML API
 
----
+Render
 
-## 🤖 AI Disease Prediction
+## Project Structure
 
-Users can:
+- frontend
+- backend
+- ml
 
-- Select symptoms
-- Predict diseases
-- View confidence scores
-- Download reports
-
----
-
-## 🌐 Live Demo
+## Live Demo
 
 Frontend:
 
-https://medi-predict-ai-ebon.vercel.app/
+`https://medi-predict-ai-ebon.vercel.app`
 
 Backend:
 
-https://medipredict-ai-w1dr.onrender.com/
+`https://medipredict-ai-w1dr.onrender.com`
 
 ML API:
 
-https://medipredict-ai-2-hcbc.onrender.com/
-
----
-
-## 👩‍💻 Developer
-
-Diksha Agrawal
-
-B.Tech CSE (2027)
-
-Full Stack Developer and AI/ML Enthusiast
+`https://medipredict-ai-2-hcbc.onrender.com`
